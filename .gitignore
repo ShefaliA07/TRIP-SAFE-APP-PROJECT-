@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+target/
+dist/
+dist-ssr/
+build/
+*.class
+*.jar
+*.war
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Database files
+data/
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+
+# Archives
+*.zip
+*.tar.gz
+*.tar
+
+# System and IDE
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.log

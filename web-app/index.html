@@ -1,0 +1,2642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripSafe — Pre-Travel Attendance Risk Projector</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- React and ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+              950: '#1e1b4b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .pulse-glow {
+      box-shadow: 0 0 15px rgba(79, 70, 229, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased min-h-screen flex flex-col">
+  <div id="root"></div>
+
+  <!-- React Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- INITIAL SEED DATA ---
+    const DEFAULT_SUBJECTS = [
+      { id: 1, name: 'Data Structures & Algorithms', code: 'CS301', classesConducted: 75, classesAttended: 60, minAttendancePercentage: 75, color: '#4f46e5' },
+      { id: 2, name: 'Database Management Systems', code: 'CS302', classesConducted: 55, classesAttended: 48, minAttendancePercentage: 75, color: '#0891b2' },
+      { id: 3, name: 'Operating Systems', code: 'CS303', classesConducted: 65, classesAttended: 52, minAttendancePercentage: 75, color: '#059669' },
+      { id: 4, name: 'Computer Networks', code: 'CS304', classesConducted: 50, classesAttended: 39, minAttendancePercentage: 75, color: '#d97706' },
+      { id: 5, name: 'Software Engineering', code: 'CS305', classesConducted: 45, classesAttended: 37, minAttendancePercentage: 75, color: '#7c3aed' },
+    ];
+
+    const DEFAULT_TIMETABLE = [
+      { id: 1, dayOfWeek: 'MONDAY', periodIndex: 1, slotTime: '09:00 - 10:00', subjectId: 1 },
+      { id: 2, dayOfWeek: 'MONDAY', periodIndex: 2, slotTime: '10:15 - 11:15', subjectId: 2 },
+      { id: 3, dayOfWeek: 'MONDAY', periodIndex: 3, slotTime: '11:30 - 12:30', subjectId: 3 },
+      { id: 4, dayOfWeek: 'MONDAY', periodIndex: 4, slotTime: '02:00 - 03:00', subjectId: 4 },
+
+      { id: 5, dayOfWeek: 'TUESDAY', periodIndex: 1, slotTime: '09:00 - 10:00', subjectId: 5 },
+      { id: 6, dayOfWeek: 'TUESDAY', periodIndex: 2, slotTime: '10:15 - 11:15', subjectId: 1 },
+      { id: 7, dayOfWeek: 'TUESDAY', periodIndex: 3, slotTime: '11:30 - 12:30', subjectId: 2 },
+      { id: 8, dayOfWeek: 'TUESDAY', periodIndex: 4, slotTime: '02:00 - 03:00', subjectId: 3 },
+
+      { id: 9, dayOfWeek: 'WEDNESDAY', periodIndex: 1, slotTime: '09:00 - 10:00', subjectId: 4 },
+      { id: 10, dayOfWeek: 'WEDNESDAY', periodIndex: 2, slotTime: '10:15 - 11:15', subjectId: 5 },
+      { id: 11, dayOfWeek: 'WEDNESDAY', periodIndex: 3, slotTime: '11:30 - 12:30', subjectId: 1 },
+      { id: 12, dayOfWeek: 'WEDNESDAY', periodIndex: 4, slotTime: '02:00 - 03:00', subjectId: 2 },
+
+      { id: 13, dayOfWeek: 'THURSDAY', periodIndex: 1, slotTime: '09:00 - 10:00', subjectId: 3 },
+      { id: 14, dayOfWeek: 'THURSDAY', periodIndex: 2, slotTime: '10:15 - 11:15', subjectId: 4 },
+      { id: 15, dayOfWeek: 'THURSDAY', periodIndex: 3, slotTime: '11:30 - 12:30', subjectId: 5 },
+      { id: 16, dayOfWeek: 'THURSDAY', periodIndex: 4, slotTime: '02:00 - 03:00', subjectId: 1 },
+
+      { id: 17, dayOfWeek: 'FRIDAY', periodIndex: 1, slotTime: '09:00 - 10:00', subjectId: 2 },
+      { id: 18, dayOfWeek: 'FRIDAY', periodIndex: 2, slotTime: '10:15 - 11:15', subjectId: 3 },
+      { id: 19, dayOfWeek: 'FRIDAY', periodIndex: 3, slotTime: '11:30 - 12:30', subjectId: 4 },
+      { id: 20, dayOfWeek: 'FRIDAY', periodIndex: 4, slotTime: '02:00 - 03:00', subjectId: 5 },
+    ];
+
+    const DEFAULT_HOLIDAYS = [
+      { id: 1, date: '2026-11-05', name: 'College Foundation Day', description: 'Annual cultural day - non-instructional' },
+      { id: 2, date: '2026-11-14', name: 'Semester Break / Festival', description: 'Institutional declared holiday' },
+    ];
+
+    const DEFAULT_TRIPS = [
+      {
+        id: 1,
+        tripName: 'Diwali Festive Trip Home',
+        departureDate: '2026-10-14',
+        returnDate: '2026-10-18',
+        notes: 'Celebrated festival with family in hometown',
+        overallStatus: 'SAFE',
+        safeSubjectsCount: 5,
+        atRiskSubjectsCount: 0,
+        totalClassesMissed: 4,
+        createdAt: '2026-10-19T10:30:00'
+      }
+    ];
+
+    // --- CALCULATION HELPER FUNCTIONS (Strict Java Parity) ---
+    function calculateCurrentAttendance(attended, conducted) {
+      if (!conducted || conducted <= 0) return 100.0;
+      return (attended / conducted) * 100.0;
+    }
+
+    function calculateProjectedAttendance(attended, conducted, missed) {
+      const total = conducted + missed;
+      if (total <= 0) return 100.0;
+      return (attended / total) * 100.0;
+    }
+
+    const DAYS_ORDER = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    const PERIOD_SLOTS = [
+      { index: 1, time: '09:00 - 10:00' },
+      { index: 2, time: '10:15 - 11:15' },
+      { index: 3, time: '11:30 - 12:30' },
+      { index: 4, time: '02:00 - 03:00' },
+    ];
+
+    // --- MAIN REACT COMPONENT ---
+    function App() {
+      // Navigation with hash support (e.g. #settings, #admin, #subjects, #dashboard)
+      const getInitialTab = () => {
+        const hash = window.location.hash.replace('#', '').toLowerCase();
+        if (hash === 'admin' || hash === 'settings') return 'settings';
+        if (['dashboard', 'subjects', 'timetable', 'planner', 'max-safe', 'history'].includes(hash)) return hash;
+        return 'landing';
+      };
+
+      const [currentTab, setCurrentTab] = useState(getInitialTab);
+
+      useEffect(() => {
+        const handleHashChange = () => {
+          const hash = window.location.hash.replace('#', '').toLowerCase();
+          if (hash === 'admin' || hash === 'settings') setCurrentTab('settings');
+          else if (['dashboard', 'subjects', 'timetable', 'planner', 'max-safe', 'history', 'landing'].includes(hash)) {
+            setCurrentTab(hash);
+          }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+      }, []);
+
+      const navigateTo = (tab) => {
+        window.location.hash = tab;
+        setCurrentTab(tab);
+      };
+      
+      // Data State (Stored in LocalStorage for offline persistence)
+      const [subjects, setSubjects] = useState(() => {
+        const saved = localStorage.getItem('tripsafe_subjects');
+        return saved ? JSON.parse(saved) : DEFAULT_SUBJECTS;
+      });
+
+      const [timetable, setTimetable] = useState(() => {
+        const saved = localStorage.getItem('tripsafe_timetable');
+        return saved ? JSON.parse(saved) : DEFAULT_TIMETABLE;
+      });
+
+      const [holidays, setHolidays] = useState(() => {
+        const saved = localStorage.getItem('tripsafe_holidays');
+        return saved ? JSON.parse(saved) : DEFAULT_HOLIDAYS;
+      });
+
+      const [trips, setTrips] = useState(() => {
+        const saved = localStorage.getItem('tripsafe_trips');
+        return saved ? JSON.parse(saved) : DEFAULT_TRIPS;
+      });
+
+      const [studentProfile, setStudentProfile] = useState(() => {
+        const saved = localStorage.getItem('tripsafe_profile');
+        return saved ? JSON.parse(saved) : {
+          name: 'Arjun Sharma',
+          rollNumber: '21CS108',
+          collegeName: 'Apex Institute of Technology',
+          hostelBlock: 'Himalaya Hostel, Room 402',
+          defaultMinAttendance: 75
+        };
+      });
+
+      // Backend Connection State
+      const [backendOnline, setBackendOnline] = useState(false);
+      const [isCheckingBackend, setIsCheckingBackend] = useState(false);
+
+      // Toast Notifications
+      const [toast, setToast] = useState(null);
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3800);
+      };
+
+      // Sync data to localStorage
+      useEffect(() => {
+        localStorage.setItem('tripsafe_subjects', JSON.stringify(subjects));
+      }, [subjects]);
+      useEffect(() => {
+        localStorage.setItem('tripsafe_timetable', JSON.stringify(timetable));
+      }, [timetable]);
+      useEffect(() => {
+        localStorage.setItem('tripsafe_holidays', JSON.stringify(holidays));
+      }, [holidays]);
+      useEffect(() => {
+        localStorage.setItem('tripsafe_trips', JSON.stringify(trips));
+      }, [trips]);
+      useEffect(() => {
+        localStorage.setItem('tripsafe_profile', JSON.stringify(studentProfile));
+      }, [studentProfile]);
+
+      // Check Backend Health
+      const checkBackend = async () => {
+        setIsCheckingBackend(true);
+        try {
+          const res = await fetch('http://localhost:8080/api/dashboard', { signal: AbortSignal.timeout(1500) });
+          if (res.ok) {
+            setBackendOnline(true);
+            showToast('Spring Boot REST API connected!', 'success');
+          } else {
+            setBackendOnline(false);
+          }
+        } catch (e) {
+          setBackendOnline(false);
+        } finally {
+          setIsCheckingBackend(false);
+        }
+      };
+
+      useEffect(() => {
+        checkBackend();
+      }, []);
+
+      // Trigger lucide icon replacement after DOM updates
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+
+      // --- DERIVED METRICS ---
+      const subjectStats = useMemo(() => {
+        return subjects.map(s => {
+          const currentPct = calculateCurrentAttendance(s.classesAttended, s.classesConducted);
+          const isSafe = currentPct >= s.minAttendancePercentage;
+          return {
+            ...s,
+            currentPct,
+            isSafe
+          };
+        });
+      }, [subjects]);
+
+      const averageAttendance = useMemo(() => {
+        if (subjectStats.length === 0) return 0;
+        return subjectStats.reduce((acc, s) => acc + s.currentPct, 0) / subjectStats.length;
+      }, [subjectStats]);
+
+      const safeCount = subjectStats.filter(s => s.isSafe).length;
+      const atRiskCount = subjectStats.length - safeCount;
+
+      // Reset Demo Data
+      const handleResetDemoData = () => {
+        setSubjects(DEFAULT_SUBJECTS);
+        setTimetable(DEFAULT_TIMETABLE);
+        setHolidays(DEFAULT_HOLIDAYS);
+        setTrips(DEFAULT_TRIPS);
+        showToast('Demo data restored successfully!', 'info');
+      };
+
+      // Clear All Data
+      const handleClearAllData = () => {
+        if (confirm('Are you sure you want to clear all data? This will empty all subjects and schedules.')) {
+          setSubjects([]);
+          setTimetable([]);
+          setHolidays([]);
+          setTrips([]);
+          showToast('All application data cleared.', 'warning');
+        }
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen">
+          {/* Top Global Header */}
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                {/* Brand Logo */}
+                <div 
+                  onClick={() => setCurrentTab('landing')}
+                  className="flex items-center gap-3 cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+                    <i data-lucide="shield-check" className="w-6 h-6"></i>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-slate-900 via-brand-900 to-indigo-900 bg-clip-text text-transparent">TripSafe</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">v1.0</span>
+                    </div>
+                    <p className="text-xs text-slate-500 hidden sm:block">Pre-Travel Attendance Risk Projector</p>
+                  </div>
+                </div>
+
+                {/* Status and Action Header Bar */}
+                <div className="flex items-center gap-3">
+                  {/* Backend Status Pill */}
+                  <div 
+                    onClick={checkBackend}
+                    title="Click to re-verify backend connectivity"
+                    className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full border cursor-pointer transition-all ${
+                      backendOnline 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${backendOnline ? 'bg-emerald-500' : 'bg-blue-500'}`}></span>
+                    <span className="hidden md:inline">
+                      {backendOnline ? 'Spring Boot REST API: Connected' : 'Engine: Local Simulated Fallback'}
+                    </span>
+                    <span className="md:hidden">
+                      {backendOnline ? 'API Online' : 'Local Engine'}
+                    </span>
+                    {isCheckingBackend && <i data-lucide="loader-2" className="w-3 h-3 animate-spin"></i>}
+                  </div>
+
+                  {/* Quick Plan Trip CTA */}
+                  <button
+                    onClick={() => setCurrentTab('planner')}
+                    className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm shadow-brand-500/25 transition-all active:scale-95"
+                  >
+                    <i data-lucide="calendar" className="w-3.5 h-3.5"></i>
+                    <span>Plan Trip</span>
+                  </button>
+
+                  {/* Profile Indicator */}
+                  <div 
+                    onClick={() => setCurrentTab('settings')}
+                    className="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer hover:opacity-80"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs shadow-inner">
+                      AS
+                    </div>
+                    <div className="text-left hidden lg:block">
+                      <p className="text-xs font-semibold text-slate-800 leading-tight">{studentProfile.name}</p>
+                      <p className="text-[10px] text-slate-500">{studentProfile.hostelBlock.split(',')[0]}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Navigation Tabs */}
+            <div className="bg-slate-50 border-t border-slate-200/80 px-4 sm:px-6 lg:px-8 overflow-x-auto">
+              <div className="max-w-7xl mx-auto flex gap-1 sm:gap-2 py-1.5 min-w-max">
+                {[
+                  { id: 'landing', label: 'Overview & Guide', icon: 'sparkles' },
+                  { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                  { id: 'subjects', label: `Subjects (${subjects.length})`, icon: 'book-open' },
+                  { id: 'timetable', label: 'Weekly Timetable', icon: 'calendar-days' },
+                  { id: 'planner', label: 'Trip Planner (Core)', icon: 'plane-takeoff', highlight: true },
+                  { id: 'max-safe', label: 'Find Max Safe Trip', icon: 'compass' },
+                  { id: 'history', label: `Trip History (${trips.length})`, icon: 'history' },
+                  { id: 'settings', label: 'Administration & Settings', icon: 'settings-2' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => navigateTo(item.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      currentTab === item.id
+                        ? 'bg-white text-brand-700 shadow-sm border border-slate-200/80'
+                        : item.highlight
+                          ? 'text-brand-600 hover:bg-brand-50/60 font-bold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <i data-lucide={item.icon} className={`w-3.5 h-3.5 ${currentTab === item.id ? 'text-brand-600' : ''}`}></i>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </header>
+
+          {/* Toast Notification Container */}
+          {toast && (
+            <div className="fixed bottom-5 right-5 z-50 animate-bounce">
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-xs font-medium ${
+                toast.type === 'warning' ? 'bg-amber-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-slate-900'
+              }`}>
+                <i data-lucide={toast.type === 'error' ? 'alert-octagon' : toast.type === 'warning' ? 'alert-triangle' : 'check-circle-2'} className="w-4 h-4"></i>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Main Workspace Body */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {currentTab === 'landing' && (
+              <LandingPage 
+                onOpenDashboard={() => setCurrentTab('dashboard')}
+                onPlanTrip={() => setCurrentTab('planner')}
+                onManageSubjects={() => setCurrentTab('subjects')}
+              />
+            )}
+
+            {currentTab === 'dashboard' && (
+              <DashboardView
+                subjects={subjectStats}
+                averageAttendance={averageAttendance}
+                safeCount={safeCount}
+                atRiskCount={atRiskCount}
+                trips={trips}
+                onPlanTrip={() => setCurrentTab('planner')}
+                onGoToSubjects={() => setCurrentTab('subjects')}
+                onGoToTimetable={() => setCurrentTab('timetable')}
+                onLoadDemo={handleResetDemoData}
+              />
+            )}
+
+            {currentTab === 'subjects' && (
+              <SubjectManagementView
+                subjects={subjects}
+                setSubjects={setSubjects}
+                showToast={showToast}
+              />
+            )}
+
+            {currentTab === 'timetable' && (
+              <TimetableView
+                subjects={subjects}
+                timetable={timetable}
+                setTimetable={setTimetable}
+                holidays={holidays}
+                setHolidays={setHolidays}
+                showToast={showToast}
+              />
+            )}
+
+            {currentTab === 'planner' && (
+              <TripPlannerView
+                subjects={subjects}
+                timetable={timetable}
+                holidays={holidays}
+                trips={trips}
+                setTrips={setTrips}
+                showToast={showToast}
+                onViewHistory={() => setCurrentTab('history')}
+              />
+            )}
+
+            {currentTab === 'max-safe' && (
+              <MaxSafeTripView
+                subjects={subjects}
+                timetable={timetable}
+                holidays={holidays}
+                showToast={showToast}
+                onOpenPlanner={() => setCurrentTab('planner')}
+              />
+            )}
+
+            {currentTab === 'history' && (
+              <TripHistoryView
+                trips={trips}
+                setTrips={setTrips}
+                showToast={showToast}
+                onPlanTrip={() => setCurrentTab('planner')}
+              />
+            )}
+
+            {currentTab === 'settings' && (
+              <SettingsView
+                profile={studentProfile}
+                setProfile={setStudentProfile}
+                backendOnline={backendOnline}
+                onCheckBackend={checkBackend}
+                onResetDemo={handleResetDemoData}
+                onClearAll={handleClearAllData}
+                showToast={showToast}
+              />
+            )}
+          </main>
+
+          {/* Clean Academic Footer */}
+          <footer className="mt-auto bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="flex items-center gap-2">
+                <i data-lucide="shield" className="w-4 h-4 text-brand-600"></i>
+                <span className="font-semibold text-slate-800">TripSafe</span>
+                <span>— Pre-Travel Attendance Risk Projector for Hostel Students</span>
+              </div>
+              <p>College Java Full-Stack Project • Spring Boot REST & React TypeScript</p>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 1. LANDING PAGE COMPONENT
+    // =========================================================================
+    function LandingPage({ onOpenDashboard, onPlanTrip, onManageSubjects }) {
+      return (
+        <div className="space-y-12 py-4">
+          {/* Hero Section */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-brand-950 to-indigo-950 text-white p-8 sm:p-14 overflow-hidden shadow-2xl border border-indigo-900/50">
+            {/* Background Glow Orbs */}
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-brand-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10 max-w-3xl space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-400/30 text-brand-300 text-xs font-semibold uppercase tracking-wider">
+                <i data-lucide="check-circle" className="w-3.5 h-3.5 text-brand-400"></i>
+                <span>College Attendance Risk Projector</span>
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight sm:leading-none">
+                Travel Home Without Losing Track of Attendance.
+              </h1>
+
+              <p className="text-slate-300 text-base sm:text-lg leading-relaxed">
+                Hostel students shouldn't have to guess or manually calculate class cuts before booking travel.
+                <strong className="text-white font-semibold"> TripSafe</strong> models your weekly timetable, excludes institutional holidays, and calculates accurate subject-wise attendance projections down to the single class.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <button
+                  onClick={onOpenDashboard}
+                  className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-6 py-3.5 rounded-xl shadow-lg shadow-brand-600/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <i data-lucide="layout-dashboard" className="w-5 h-5"></i>
+                  <span>Open Dashboard</span>
+                </button>
+
+                <button
+                  onClick={onPlanTrip}
+                  className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-semibold px-6 py-3.5 rounded-xl border border-white/20 transition-all"
+                >
+                  <i data-lucide="plane-takeoff" className="w-5 h-5 text-brand-300"></i>
+                  <span>Simulate a Trip</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Live Preview Cards Grid */}
+            <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                <div className="text-xs text-slate-400 mb-1">Standard Cutoff</div>
+                <div className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span>75.0%</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Mandatory</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">Strict university eligibility rule for end-semester exams</p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                <div className="text-xs text-slate-400 mb-1">Missed Class Projection</div>
+                <div className="text-2xl font-bold text-emerald-400 font-mono">
+                  A / (C + M)
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">Exact mathematical model counting future conducted sessions</p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10">
+                <div className="text-xs text-slate-400 mb-1">Smart Holiday Bypass</div>
+                <div className="text-2xl font-bold text-indigo-300 flex items-center gap-1.5">
+                  <i data-lucide="calendar-check" className="w-5 h-5"></i>
+                  <span>Zero Bias</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2">Holidays & cancelled classes automatically deducted from cuts</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 3-Step "How It Works" Section */}
+          <div className="space-y-6">
+            <div className="text-center max-w-xl mx-auto space-y-2">
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">How TripSafe Protects You</h2>
+              <p className="text-slate-500 text-sm">Three easy steps to never worry about attendance debarment.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 hover:shadow-md transition-shadow">
+                <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-lg border border-brand-200">
+                  1
+                </div>
+                <h3 className="font-bold text-base text-slate-900">Enter Subjects & Records</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Input your current conducted and attended class tallies. TripSafe computes your current percentage and monitors individual subject margins.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 hover:shadow-md transition-shadow">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-200">
+                  2
+                </div>
+                <h3 className="font-bold text-base text-slate-900">Set Timetable & Holidays</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Map your weekly schedule from Monday to Sunday. Add institutional holidays so non-instructional days are not falsely penalized as cuts.
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 hover:shadow-md transition-shadow">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg border border-emerald-200">
+                  3
+                </div>
+                <h3 className="font-bold text-base text-slate-900">Project Risk or Find Max Safe Days</h3>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  Select your travel departure and return dates. Receive a complete breakdown showing every subject's drop, bottleneck alerts, and safety status.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="bg-slate-100/70 rounded-2xl p-6 sm:p-8 border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-6">Engineered for Academic Compliance</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
+                <i data-lucide="shield-alert" className="w-5 h-5 text-rose-500"></i>
+                <h4 className="font-bold text-sm text-slate-800">Strict Subject Isolation</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  No false averages. If 4 subjects have 95% but 1 drops to 74%, the trip is flagged as AT RISK.
+                </p>
+              </div>
+
+              <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
+                <i data-lucide="gauge" className="w-5 h-5 text-brand-600"></i>
+                <h4 className="font-bold text-sm text-slate-800">Max Safe Trip Finder</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Select your departure date and let the engine find the longest consecutive safe journey.
+                </p>
+              </div>
+
+              <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
+                <i data-lucide="calendar" className="w-5 h-5 text-indigo-600"></i>
+                <h4 className="font-bold text-sm text-slate-800">Inclusive Counting</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Accurately calculates missed classes from departure day morning through return day evening.
+                </p>
+              </div>
+
+              <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
+                <i data-lucide="database" className="w-5 h-5 text-teal-600"></i>
+                <h4 className="font-bold text-sm text-slate-800">Trip Snapshot History</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Preserves past trip predictions and impact breakdowns for future review and audit.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 2. DASHBOARD VIEW COMPONENT
+    // =========================================================================
+    function DashboardView({ subjects, averageAttendance, safeCount, atRiskCount, trips, onPlanTrip, onGoToSubjects, onGoToTimetable, onLoadDemo }) {
+      if (subjects.length === 0) {
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-xl mx-auto space-y-4 my-8">
+            <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center">
+              <i data-lucide="book-plus" className="w-8 h-8"></i>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">No Subjects Added Yet</h2>
+            <p className="text-slate-500 text-sm">
+              Your attendance tracker is currently empty. Get started by loading the sample college dataset or entering your subjects manually.
+            </p>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={onLoadDemo}
+                className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg"
+              >
+                Load College Demo Data
+              </button>
+              <button
+                onClick={onGoToSubjects}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-4 py-2.5 rounded-lg border border-slate-200"
+              >
+                Add Subjects Manually
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const upcomingTrip = trips.find(t => t.departureDate >= today);
+
+      return (
+        <div className="space-y-6">
+          {/* Welcome Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Attendance Dashboard</h1>
+              <p className="text-xs sm:text-sm text-slate-500">Live academic status and pre-travel projection metrics.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onPlanTrip}
+                className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+              >
+                <i data-lucide="plane-takeoff" className="w-4 h-4"></i>
+                <span>Plan New Trip</span>
+              </button>
+              <button
+                onClick={onGoToTimetable}
+                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-200"
+              >
+                <i data-lucide="calendar" className="w-4 h-4"></i>
+                <span>Timetable</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Key Metric Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium uppercase tracking-wider">Total Subjects</span>
+                <i data-lucide="book-open" className="w-4 h-4 text-brand-600"></i>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">{subjects.length}</div>
+              <div className="text-[11px] text-slate-500">Active coursework modules</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium uppercase tracking-wider">Average Attendance</span>
+                <i data-lucide="percent" className="w-4 h-4 text-indigo-600"></i>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-baseline gap-2">
+                <span>{averageAttendance.toFixed(1)}%</span>
+                <span className={`text-xs font-bold ${averageAttendance >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {averageAttendance >= 75 ? '✓ Safe' : '⚠ Below 75%'}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500">Across all enrolled subjects</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium uppercase tracking-wider">Subjects Safe</span>
+                <i data-lucide="check-circle" className="w-4 h-4 text-emerald-600"></i>
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-emerald-600">{safeCount}</div>
+              <div className="text-[11px] text-slate-500">Meeting minimum 75% cutoff</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium uppercase tracking-wider">Subjects At Risk</span>
+                <i data-lucide="alert-triangle" className="w-4 h-4 text-rose-500"></i>
+              </div>
+              <div className={`text-2xl sm:text-3xl font-extrabold ${atRiskCount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                {atRiskCount}
+              </div>
+              <div className="text-[11px] text-slate-500">Require immediate attendance care</div>
+            </div>
+          </div>
+
+          {/* Upcoming Trip Alert Card (if planned) */}
+          {upcomingTrip && (
+            <div className="bg-gradient-to-r from-brand-900 to-indigo-900 text-white p-5 rounded-2xl shadow-md border border-brand-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-brand-300">
+                  <i data-lucide="plane" className="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div className="text-xs text-brand-200 font-semibold uppercase tracking-wider">Next Planned Journey</div>
+                  <h3 className="text-base font-bold text-white">{upcomingTrip.tripName}</h3>
+                  <p className="text-xs text-slate-300">
+                    {upcomingTrip.departureDate} to {upcomingTrip.returnDate} • Misses {upcomingTrip.totalClassesMissed} classes
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                  upcomingTrip.overallStatus === 'SAFE' 
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  {upcomingTrip.overallStatus === 'SAFE' ? '✓ SAFE TO TRAVEL' : '⚠ AT RISK'}
+                </span>
+                <button
+                  onClick={onPlanTrip}
+                  className="bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20"
+                >
+                  Adjust Dates
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Visual Attendance Bar Chart Section */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Attendance vs. Minimum Requirement (75%)</h3>
+                <p className="text-xs text-slate-500">Subject-wise comparison against institutional threshold.</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-brand-600"></span>
+                  <span className="text-slate-600">Current Pct</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 bg-rose-500 border-t-2 border-dashed border-rose-500"></span>
+                  <span className="text-slate-600">75% Threshold</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom SVG Responsive Chart */}
+            <div className="space-y-4 pt-2">
+              {subjects.map(sub => {
+                const isSafe = sub.currentPct >= sub.minAttendancePercentage;
+                return (
+                  <div key={sub.id} className="space-y-1">
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="font-semibold text-slate-800 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: sub.color }}></span>
+                        {sub.name} <span className="text-slate-400 font-mono text-[10px]">({sub.code})</span>
+                      </span>
+                      <span className="font-mono text-xs font-bold text-slate-800">
+                        {sub.classesAttended}/{sub.classesConducted} classes ({sub.currentPct.toFixed(1)}%)
+                      </span>
+                    </div>
+
+                    <div className="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+                      {/* Required threshold vertical dashed marker at 75% */}
+                      <div 
+                        className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-10 border-l border-dashed border-rose-600"
+                        style={{ left: `${sub.minAttendancePercentage}%` }}
+                        title={`Required: ${sub.minAttendancePercentage}%`}
+                      ></div>
+
+                      {/* Current Attendance Bar */}
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          isSafe ? 'bg-indigo-600' : 'bg-rose-500'
+                        }`}
+                        style={{ width: `${Math.min(sub.currentPct, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Subject Overview Grid */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Enrolled Subjects Overview</h3>
+                <p className="text-xs text-slate-500">Detailed breakdown of class counts and margin cushion.</p>
+              </div>
+              <button
+                onClick={onGoToSubjects}
+                className="text-xs text-brand-600 hover:text-brand-800 font-semibold"
+              >
+                Manage Subjects →
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Subject Name</th>
+                    <th className="py-2.5 px-3">Code</th>
+                    <th className="py-2.5 px-3">Conducted</th>
+                    <th className="py-2.5 px-3">Attended</th>
+                    <th className="py-2.5 px-3">Current %</th>
+                    <th className="py-2.5 px-3">Req %</th>
+                    <th className="py-2.5 px-3">Cushion / Deficit</th>
+                    <th className="py-2.5 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {subjects.map(s => {
+                    const margin = s.currentPct - s.minAttendancePercentage;
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50/80">
+                        <td className="py-3 px-3 font-semibold text-slate-900 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }}></span>
+                          {s.name}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-500">{s.code || '—'}</td>
+                        <td className="py-3 px-3">{s.classesConducted}</td>
+                        <td className="py-3 px-3">{s.classesAttended}</td>
+                        <td className="py-3 px-3 font-bold text-slate-900">{s.currentPct.toFixed(1)}%</td>
+                        <td className="py-3 px-3 text-slate-500">{s.minAttendancePercentage}%</td>
+                        <td className="py-3 px-3 font-mono">
+                          {margin >= 0 ? (
+                            <span className="text-emerald-600 font-semibold">+{margin.toFixed(1)}%</span>
+                          ) : (
+                            <span className="text-rose-600 font-semibold">{margin.toFixed(1)}%</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            s.isSafe
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {s.isSafe ? 'SAFE' : 'AT RISK'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 3. SUBJECT MANAGEMENT VIEW
+    // =========================================================================
+    function SubjectManagementView({ subjects, setSubjects, showToast }) {
+      const [search, setSearch] = useState('');
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [editingSubject, setEditingSubject] = useState(null);
+
+      // Form state
+      const [name, setName] = useState('');
+      const [code, setCode] = useState('');
+      const [conducted, setConducted] = useState(60);
+      const [attended, setAttended] = useState(48);
+      const [minReq, setMinReq] = useState(75);
+      const [color, setColor] = useState('#4f46e5');
+      const [formError, setFormError] = useState('');
+
+      const filtered = useMemo(() => {
+        return subjects.filter(s => 
+          s.name.toLowerCase().includes(search.toLowerCase()) || 
+          (s.code && s.code.toLowerCase().includes(search.toLowerCase()))
+        );
+      }, [subjects, search]);
+
+      const openAddModal = () => {
+        setEditingSubject(null);
+        setName('');
+        setCode('');
+        setConducted(50);
+        setAttended(40);
+        setMinReq(75);
+        setColor('#4f46e5');
+        setFormError('');
+        setIsModalOpen(true);
+      };
+
+      const openEditModal = (sub) => {
+        setEditingSubject(sub);
+        setName(sub.name);
+        setCode(sub.code || '');
+        setConducted(sub.classesConducted);
+        setAttended(sub.classesAttended);
+        setMinReq(sub.minAttendancePercentage);
+        setColor(sub.color || '#4f46e5');
+        setFormError('');
+        setIsModalOpen(true);
+      };
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        setFormError('');
+
+        if (!name.trim()) {
+          setFormError('Subject name cannot be empty.');
+          return;
+        }
+
+        const condNum = parseInt(conducted, 10);
+        const attNum = parseInt(attended, 10);
+        const reqNum = parseFloat(minReq);
+
+        if (isNaN(condNum) || condNum < 0) {
+          setFormError('Conducted classes must be a non-negative integer.');
+          return;
+        }
+
+        if (isNaN(attNum) || attNum < 0) {
+          setFormError('Attended classes must be a non-negative integer.');
+          return;
+        }
+
+        if (attNum > condNum) {
+          setFormError(`Classes attended (${attNum}) cannot exceed classes conducted (${condNum}).`);
+          return;
+        }
+
+        if (isNaN(reqNum) || reqNum < 0 || reqNum > 100) {
+          setFormError('Minimum requirement must be between 0% and 100%.');
+          return;
+        }
+
+        if (editingSubject) {
+          setSubjects(prev => prev.map(s => s.id === editingSubject.id ? {
+            ...s,
+            name: name.trim(),
+            code: code.trim().toUpperCase(),
+            classesConducted: condNum,
+            classesAttended: attNum,
+            minAttendancePercentage: reqNum,
+            color
+          } : s));
+          showToast(`Subject "${name}" updated successfully!`, 'success');
+        } else {
+          const newId = subjects.length > 0 ? Math.max(...subjects.map(s => s.id)) + 1 : 1;
+          const newSub = {
+            id: newId,
+            name: name.trim(),
+            code: code.trim().toUpperCase(),
+            classesConducted: condNum,
+            classesAttended: attNum,
+            minAttendancePercentage: reqNum,
+            color
+          };
+          setSubjects(prev => [...prev, newSub]);
+          showToast(`Subject "${name}" added!`, 'success');
+        }
+
+        setIsModalOpen(false);
+      };
+
+      const handleDelete = (id, subName) => {
+        if (confirm(`Are you sure you want to delete "${subName}"? This will also remove any weekly timetable slots assigned to this subject.`)) {
+          setSubjects(prev => prev.filter(s => s.id !== id));
+          showToast(`Subject "${subName}" removed.`, 'warning');
+        }
+      };
+
+      const previewPct = calculateCurrentAttendance(attended, conducted);
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Subject Management</h1>
+              <p className="text-xs sm:text-sm text-slate-500">Configure academic subjects, class tallies, and target percentages.</p>
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search subject or code..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full sm:w-56 text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600"
+              />
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm whitespace-nowrap"
+              >
+                <i data-lucide="plus" className="w-4 h-4"></i>
+                <span>Add Subject</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Subjects Table / Cards */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Subject</th>
+                    <th className="py-3 px-4">Code</th>
+                    <th className="py-3 px-4">Conducted</th>
+                    <th className="py-3 px-4">Attended</th>
+                    <th className="py-3 px-4">Current Attendance</th>
+                    <th className="py-3 px-4">Target Req</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-8 text-center text-slate-400">
+                        No subjects match your query.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map(s => {
+                      const pct = calculateCurrentAttendance(s.classesAttended, s.classesConducted);
+                      const isSafe = pct >= s.minAttendancePercentage;
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-50/60">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color || '#4f46e5' }}></span>
+                              <span className="font-bold text-slate-900">{s.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-slate-500">{s.code || '—'}</td>
+                          <td className="py-3 px-4 text-slate-800">{s.classesConducted}</td>
+                          <td className="py-3 px-4 text-slate-800">{s.classesAttended}</td>
+                          <td className="py-3 px-4">
+                            <span className="font-extrabold text-slate-900">{pct.toFixed(1)}%</span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">{s.minAttendancePercentage}%</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              isSafe ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}>
+                              {isSafe ? 'SAFE' : 'AT RISK'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => openEditModal(s)}
+                                className="p-1.5 text-slate-600 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                title="Edit Subject"
+                              >
+                                <i data-lucide="edit-3" className="w-4 h-4"></i>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(s.id, s.name)}
+                                className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Delete Subject"
+                              >
+                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Add / Edit Subject Modal */}
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-150">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-base text-slate-900">
+                    {editingSubject ? 'Edit Subject' : 'Add New Subject'}
+                  </h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" className="w-5 h-5"></i>
+                  </button>
+                </div>
+
+                {formError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <i data-lucide="alert-circle" className="w-4 h-4 flex-shrink-0"></i>
+                    <span>{formError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSave} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Subject Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Operating Systems"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Subject Code</label>
+                      <input
+                        type="text"
+                        placeholder="CS303"
+                        value={code}
+                        onChange={e => setCode(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-xl border-slate-300 uppercase focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Badge Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={e => setColor(e.target.value)}
+                          className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                        />
+                        <span className="font-mono text-slate-500">{color}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Classes Conducted *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={conducted}
+                        onChange={e => setConducted(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Classes Attended *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={attended}
+                        onChange={e => setAttended(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Minimum Required Attendance (%) *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="0.5"
+                      required
+                      value={minReq}
+                      onChange={e => setMinReq(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  {/* Realtime Live Preview Calculation Box */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+                    <div>
+                      <span className="text-[11px] text-slate-500">Calculated Attendance:</span>
+                      <div className="font-bold text-sm text-slate-900">
+                        {previewPct.toFixed(1)}%
+                      </div>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      previewPct >= minReq ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {previewPct >= minReq ? '✓ SAFE' : '⚠ AT RISK'}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-sm"
+                    >
+                      {editingSubject ? 'Update Subject' : 'Save Subject'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 4. WEEKLY TIMETABLE & HOLIDAY VIEW
+    // =========================================================================
+    function TimetableView({ subjects, timetable, setTimetable, holidays, setHolidays, showToast }) {
+      const [activeSubTab, setActiveSubTab] = useState('grid'); // 'grid' | 'holidays'
+      
+      // Slot Assignment Modal State
+      const [slotModalOpen, setSlotModalOpen] = useState(false);
+      const [selectedDay, setSelectedDay] = useState('MONDAY');
+      const [selectedPeriod, setSelectedPeriod] = useState(1);
+      const [selectedTime, setSelectedTime] = useState('09:00 - 10:00');
+      const [selectedSubjectId, setSelectedSubjectId] = useState(subjects[0]?.id || 1);
+
+      // Holiday Modal State
+      const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+      const [holidayDate, setHolidayDate] = useState('');
+      const [holidayName, setHolidayName] = useState('');
+      const [holidayDesc, setHolidayDesc] = useState('');
+
+      const openSlotModal = (day, periodIndex, time) => {
+        setSelectedDay(day);
+        setSelectedPeriod(periodIndex);
+        setSelectedTime(time);
+        const existing = timetable.find(t => t.dayOfWeek === day && t.periodIndex === periodIndex);
+        setSelectedSubjectId(existing ? existing.subjectId : (subjects[0]?.id || 1));
+        setSlotModalOpen(true);
+      };
+
+      const handleSaveSlot = (e) => {
+        e.preventDefault();
+        const subIdNum = parseInt(selectedSubjectId, 10);
+        const sub = subjects.find(s => s.id === subIdNum);
+        if (!sub) return;
+
+        setTimetable(prev => {
+          const filtered = prev.filter(t => !(t.dayOfWeek === selectedDay && t.periodIndex === selectedPeriod));
+          const newEntry = {
+            id: Date.now(),
+            dayOfWeek: selectedDay,
+            periodIndex: selectedPeriod,
+            slotTime: selectedTime,
+            subjectId: subIdNum
+          };
+          return [...filtered, newEntry];
+        });
+
+        showToast(`Slot assigned: ${selectedDay} Period ${selectedPeriod} → ${sub.name}`);
+        setSlotModalOpen(false);
+      };
+
+      const handleClearSlot = (day, periodIndex) => {
+        setTimetable(prev => prev.filter(t => !(t.dayOfWeek === day && t.periodIndex === periodIndex)));
+        showToast(`Cleared slot on ${day} Period ${periodIndex}.`, 'info');
+      };
+
+      const handleAddHoliday = (e) => {
+        e.preventDefault();
+        if (!holidayDate || !holidayName.trim()) {
+          alert('Please enter a valid date and holiday title.');
+          return;
+        }
+
+        const newHol = {
+          id: Date.now(),
+          date: holidayDate,
+          name: holidayName.trim(),
+          description: holidayDesc.trim()
+        };
+        setHolidays(prev => [...prev, newHol]);
+        showToast(`Holiday "${holidayName}" added for ${holidayDate}.`);
+        setHolidayDate('');
+        setHolidayName('');
+        setHolidayDesc('');
+        setHolidayModalOpen(false);
+      };
+
+      const handleDeleteHoliday = (id, name) => {
+        setHolidays(prev => prev.filter(h => h.id !== id));
+        showToast(`Holiday "${name}" deleted.`);
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Weekly Timetable & Academic Holidays</h1>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Maps each class to specific days of the week so trip cuts are calculated precisely.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="bg-slate-100 p-1 rounded-xl flex gap-1 border border-slate-200">
+                <button
+                  onClick={() => setActiveSubTab('grid')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeSubTab === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Timetable Grid
+                </button>
+                <button
+                  onClick={() => setActiveSubTab('holidays')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeSubTab === 'holidays' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Holidays ({holidays.length})
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {activeSubTab === 'grid' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center text-xs text-slate-500">
+                <span>Click on any slot to assign or reassign a subject. Empty slots count as 0 classes.</span>
+                <span className="font-semibold text-brand-700">Monday - Friday College Schedule</span>
+              </div>
+
+              {/* Timetable Grid Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="py-3 px-3 text-left font-bold text-slate-700 w-32 bg-slate-50/80">Day / Period</th>
+                      {PERIOD_SLOTS.map(slot => (
+                        <th key={slot.index} className="py-3 px-3 text-center font-bold text-slate-700 bg-slate-50/80">
+                          <div>Period {slot.index}</div>
+                          <div className="text-[10px] font-normal text-slate-500">{slot.time}</div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'].map(day => (
+                      <tr key={day} className="hover:bg-slate-50/40">
+                        <td className="py-3 px-3 font-bold text-slate-800 bg-slate-50/40">{day}</td>
+                        {PERIOD_SLOTS.map(slot => {
+                          const entry = timetable.find(t => t.dayOfWeek === day && t.periodIndex === slot.index);
+                          const sub = entry ? subjects.find(s => s.id === entry.subjectId) : null;
+                          return (
+                            <td key={slot.index} className="py-2.5 px-2 text-center">
+                              {sub ? (
+                                <div 
+                                  onClick={() => openSlotModal(day, slot.index, slot.time)}
+                                  className="group relative p-2.5 rounded-xl border text-left cursor-pointer transition-all hover:scale-[1.02] shadow-sm"
+                                  style={{ backgroundColor: `${sub.color}15`, borderColor: `${sub.color}50` }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-[11px] truncate text-slate-900" title={sub.name}>
+                                      {sub.name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleClearSlot(day, slot.index); }}
+                                      className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                      title="Clear slot"
+                                    >
+                                      <i data-lucide="x" className="w-3 h-3"></i>
+                                    </button>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-600 mt-1 flex items-center justify-between">
+                                    <span>{sub.code || 'CS'}</span>
+                                    <span className="text-[9px] px-1.5 rounded-full" style={{ backgroundColor: sub.color, color: '#fff' }}>
+                                      {sub.minAttendancePercentage}%
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openSlotModal(day, slot.index, slot.time)}
+                                  className="w-full py-3 px-2 rounded-xl border border-dashed border-slate-200 hover:border-brand-400 hover:bg-brand-50/30 text-slate-400 hover:text-brand-600 text-xs transition-colors"
+                                >
+                                  + Assign
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeSubTab === 'holidays' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Registered Institutional Holidays</h3>
+                  <p className="text-xs text-slate-500">
+                    Dates registered here will NOT count as missed classes during student trips.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setHolidayModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl"
+                >
+                  <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                  <span>Add Holiday</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                {holidays.map(h => (
+                  <div key={h.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                        <i data-lucide="calendar" className="w-3 h-3"></i>
+                        <span>{h.date}</span>
+                      </div>
+                      <h4 className="font-bold text-sm text-slate-900">{h.name}</h4>
+                      {h.description && <p className="text-xs text-slate-500">{h.description}</p>}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteHoliday(h.id, h.name)}
+                      className="text-slate-400 hover:text-rose-600 p-1"
+                      title="Delete Holiday"
+                    >
+                      <i data-lucide="trash-2" className="w-4 h-4"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Slot Assignment Modal */}
+          {slotModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Assign Slot: {selectedDay} (Period {selectedPeriod})
+                  </h3>
+                  <button onClick={() => setSlotModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveSlot} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Select Subject</label>
+                    <select
+                      value={selectedSubjectId}
+                      onChange={e => setSelectedSubjectId(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      {subjects.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.code || 'CS'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Slot Timing</label>
+                    <input
+                      type="text"
+                      value={selectedTime}
+                      onChange={e => setSelectedTime(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setSlotModalOpen(false)}
+                      className="px-3 py-1.5 text-slate-600 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl"
+                    >
+                      Assign Slot
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Add Holiday Modal */}
+          {holidayModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <h3 className="font-bold text-sm text-slate-900">Add Academic Holiday</h3>
+                  <button onClick={() => setHolidayModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddHoliday} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Holiday Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={holidayDate}
+                      onChange={e => setHolidayDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Holiday Title *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Diwali Break"
+                      value={holidayName}
+                      onChange={e => setHolidayName(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Description (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. College closed for festivities"
+                      value={holidayDesc}
+                      onChange={e => setHolidayDesc(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setHolidayModalOpen(false)}
+                      className="px-3 py-1.5 text-slate-600 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl"
+                    >
+                      Save Holiday
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 5. TRIP PLANNER VIEW (CORE ENGINE)
+    // =========================================================================
+    function TripPlannerView({ subjects, timetable, holidays, trips, setTrips, showToast, onViewHistory }) {
+      // Default to next Monday - Friday
+      const getNextMonday = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + ((1 + 7 - d.getDay()) % 7 || 7));
+        return d.toISOString().split('T')[0];
+      };
+
+      const getNextFriday = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7));
+        return d.toISOString().split('T')[0];
+      };
+
+      const [tripName, setTripName] = useState('Home Weekend Visit');
+      const [departureDate, setDepartureDate] = useState(getNextMonday());
+      const [returnDate, setReturnDate] = useState(getNextFriday());
+      const [notes, setNotes] = useState('Visiting family in hometown');
+      const [projectionResult, setProjectionResult] = useState(null);
+      const [isCalculating, setIsCalculating] = useState(false);
+
+      // Core Risk Calculation
+      const handleCalculateRisk = (e) => {
+        e.preventDefault();
+        if (!departureDate || !returnDate) {
+          alert('Please choose departure and return dates.');
+          return;
+        }
+
+        const start = new Date(departureDate + 'T00:00:00');
+        const end = new Date(returnDate + 'T00:00:00');
+
+        if (end < start) {
+          alert('Return date cannot be earlier than departure date.');
+          return;
+        }
+
+        setIsCalculating(true);
+
+        setTimeout(() => {
+          // Count missed classes per subject (inclusive range, skip holidays)
+          const holidaySet = new Set(holidays.map(h => h.date));
+          const missedCounts = {};
+          subjects.forEach(s => { missedCounts[s.id] = 0; });
+
+          const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+          let cur = new Date(start);
+          let durationDays = 0;
+
+          while (cur <= end) {
+            durationDays++;
+            const dateStr = cur.toISOString().split('T')[0];
+            if (!holidaySet.has(dateStr)) {
+              const dayOfWeek = dayNames[cur.getDay()];
+              const daySlots = timetable.filter(t => t.dayOfWeek === dayOfWeek);
+              daySlots.forEach(slot => {
+                if (missedCounts[slot.subjectId] !== undefined) {
+                  missedCounts[slot.subjectId]++;
+                }
+              });
+            }
+            cur.setDate(cur.getDate() + 1);
+          }
+
+          let safeCount = 0;
+          let atRiskCount = 0;
+          let totalMissed = 0;
+          let bottleneck = null;
+
+          const subjectProjections = subjects.map(sub => {
+            const missed = missedCounts[sub.id] || 0;
+            totalMissed += missed;
+
+            const currentPct = calculateCurrentAttendance(sub.classesAttended, sub.classesConducted);
+            const projectedPct = calculateProjectedAttendance(sub.classesAttended, sub.classesConducted, missed);
+            const isSafe = (projectedPct + 1e-9) >= sub.minAttendancePercentage;
+            const margin = projectedPct - sub.minAttendancePercentage;
+
+            if (isSafe) safeCount++;
+            else atRiskCount++;
+
+            let explanation = '';
+            if (missed === 0) {
+              explanation = `No scheduled classes in this trip window. Attendance holds steady at ${currentPct.toFixed(1)}%.`;
+            } else if (isSafe) {
+              explanation = `Missing ${missed} class(es) reduces attendance from ${currentPct.toFixed(1)}% to ${projectedPct.toFixed(1)}% (remains ${margin.toFixed(1)}% above the required ${sub.minAttendancePercentage}%).`;
+            } else {
+              explanation = `CRITICAL DEBARMENT RISK: Missing ${missed} class(es) plunges attendance to ${projectedPct.toFixed(1)}%, falling ${Math.abs(margin).toFixed(1)}% below the ${sub.minAttendancePercentage}% cutoff!`;
+            }
+
+            const item = {
+              subjectId: sub.id,
+              subjectName: sub.name,
+              subjectCode: sub.code,
+              color: sub.color,
+              classesConductedBefore: sub.classesConducted,
+              classesAttended: sub.classesAttended,
+              currentAttendancePercentage: currentPct,
+              expectedMissedClasses: missed,
+              classesConductedAfter: sub.classesConducted + missed,
+              projectedAttendancePercentage: projectedPct,
+              requiredAttendancePercentage: sub.minAttendancePercentage,
+              isSafe,
+              riskMargin: margin,
+              explanation
+            };
+
+            if (!bottleneck || margin < bottleneck.riskMargin) {
+              bottleneck = item;
+            }
+
+            return item;
+          });
+
+          // STRICT RULE: Safe ONLY if ALL subjects are safe!
+          const overallStatus = atRiskCount > 0 ? 'AT_RISK' : 'SAFE';
+
+          const result = {
+            tripName: tripName || 'Planned Travel',
+            departureDate,
+            returnDate,
+            durationDays,
+            overallStatus,
+            safeCount,
+            atRiskCount,
+            totalMissedClasses: totalMissed,
+            subjectProjections,
+            bottleneck,
+            calculatedAt: new Date().toISOString()
+          };
+
+          setProjectionResult(result);
+          setIsCalculating(false);
+          showToast(`Projection calculated: Overall Trip is ${overallStatus === 'SAFE' ? 'SAFE' : 'AT RISK'}!`, overallStatus === 'SAFE' ? 'success' : 'warning');
+        }, 200);
+      };
+
+      // Save Trip to History
+      const handleSaveTrip = () => {
+        if (!projectionResult) return;
+        const newTrip = {
+          id: Date.now(),
+          tripName: projectionResult.tripName,
+          departureDate: projectionResult.departureDate,
+          returnDate: projectionResult.returnDate,
+          notes,
+          overallStatus: projectionResult.overallStatus,
+          safeSubjectsCount: projectionResult.safeCount,
+          atRiskSubjectsCount: projectionResult.atRiskCount,
+          totalClassesMissed: projectionResult.totalMissedClasses,
+          projectionDetailsJson: JSON.stringify(projectionResult.subjectProjections),
+          createdAt: new Date().toISOString()
+        };
+
+        setTrips(prev => [newTrip, ...prev]);
+        showToast(`Trip "${projectionResult.tripName}" saved to history!`, 'success');
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 text-[11px] font-bold uppercase tracking-wider mb-1 border border-brand-200">
+                <i data-lucide="shield" className="w-3 h-3"></i>
+                <span>Core Attendance Projector</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Pre-Travel Attendance Risk Calculator</h1>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Simulate your journey and get an instant subject-wise risk assessment.
+              </p>
+            </div>
+            <button
+              onClick={onViewHistory}
+              className="text-xs font-semibold text-brand-600 hover:text-brand-800 flex items-center gap-1"
+            >
+              <i data-lucide="history" className="w-4 h-4"></i>
+              <span>View Past Saved Trips ({trips.length})</span>
+            </button>
+          </div>
+
+          {/* Form Card */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <form onSubmit={handleCalculateRisk} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Trip Name / Purpose</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Festival Homecoming"
+                    value={tripName}
+                    onChange={e => setTripName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Departure Date (Inclusive)</label>
+                  <input
+                    type="date"
+                    required
+                    value={departureDate}
+                    onChange={e => setDepartureDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Return Date (Inclusive)</label>
+                  <input
+                    type="date"
+                    required
+                    value={returnDate}
+                    onChange={e => setReturnDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-xs">Trip Notes (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Train leaves at 6 AM, returning Sunday night"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                <span className="text-xs text-slate-500">
+                  Counting classes across all schedule days, excluding {holidays.length} recorded holidays.
+                </span>
+                <button
+                  type="submit"
+                  disabled={isCalculating}
+                  className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-md transition-all active:scale-95"
+                >
+                  <i data-lucide="calculator" className="w-4 h-4"></i>
+                  <span>{isCalculating ? 'Calculating...' : 'Calculate Travel Risk'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Results Display */}
+          {projectionResult && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Overall Trip Risk Banner */}
+              <div className={`p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                projectionResult.overallStatus === 'SAFE'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                  : 'bg-rose-50 border-rose-200 text-rose-950'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-white ${
+                    projectionResult.overallStatus === 'SAFE' ? 'bg-emerald-600' : 'bg-rose-600'
+                  }`}>
+                    <i data-lucide={projectionResult.overallStatus === 'SAFE' ? 'shield-check' : 'alert-octagon'} className="w-6 h-6"></i>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/70">
+                        Trip Duration: {projectionResult.durationDays} Days
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        ({projectionResult.departureDate} → {projectionResult.returnDate})
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-extrabold">
+                      {projectionResult.overallStatus === 'SAFE'
+                        ? 'Trip Approved — Attendance Remains Safe!'
+                        : 'HIGH RISK WARNING — At Least One Subject Will Breach Attendance!'}
+                    </h3>
+                    <p className="text-xs leading-relaxed max-w-2xl opacity-90">
+                      {projectionResult.overallStatus === 'SAFE'
+                        ? `All ${projectionResult.safeCount} subjects remain at or above their minimum required attendance percentages after missing a total of ${projectionResult.totalMissedClasses} scheduled classes.`
+                        : `CRITICAL: You will miss ${projectionResult.totalMissedClasses} classes. While ${projectionResult.safeCount} subjects stay above water, ${projectionResult.atRiskCount} subject(s) breach the 75% limit. Bottleneck: '${projectionResult.bottleneck?.subjectName}' will drop to ${projectionResult.bottleneck?.projectedAttendancePercentage.toFixed(1)}%.`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleSaveTrip}
+                    className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm"
+                  >
+                    <i data-lucide="bookmark" className="w-3.5 h-3.5"></i>
+                    <span>Save Trip</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Subject-Wise Projection Breakdown Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-slate-900">Subject-by-Subject Projection Results</h3>
+                  <span className="text-xs text-slate-500 font-mono">
+                    Formula: Projected = Attended / (Conducted + Missed) × 100
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4">Subject</th>
+                        <th className="py-3 px-4">Current Attendance</th>
+                        <th className="py-3 px-4">Classes Missed</th>
+                        <th className="py-3 px-4">Projected Attendance</th>
+                        <th className="py-3 px-4">Required %</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4">Analysis & Explanation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {projectionResult.subjectProjections.map(p => (
+                        <tr key={p.subjectId} className={`hover:bg-slate-50/60 ${!p.isSafe ? 'bg-rose-50/30' : ''}`}>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }}></span>
+                              <div>
+                                <div className="font-bold text-slate-900">{p.subjectName}</div>
+                                <div className="text-[10px] font-mono text-slate-400">{p.subjectCode}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {p.classesAttended}/{p.classesConductedBefore} ({p.currentAttendancePercentage.toFixed(1)}%)
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded font-bold font-mono ${
+                              p.expectedMissedClasses > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              +{p.expectedMissedClasses} class{p.expectedMissedClasses === 1 ? '' : 'es'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-extrabold">
+                            <span className={p.isSafe ? 'text-slate-900' : 'text-rose-600'}>
+                              {p.projectedAttendancePercentage.toFixed(1)}%
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-normal">
+                              ({p.classesAttended}/{p.classesConductedAfter})
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-500">{p.requiredAttendancePercentage}%</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              p.isSafe ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-300'
+                            }`}>
+                              {p.isSafe ? 'SAFE' : 'AT RISK'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-[11px] text-slate-600 max-w-xs leading-relaxed">
+                            {p.explanation}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 6. FIND MAXIMUM SAFE TRIP VIEW
+    // =========================================================================
+    function MaxSafeTripView({ subjects, timetable, holidays, showToast, onOpenPlanner }) {
+      const today = new Date().toISOString().split('T')[0];
+      const [depDate, setDepDate] = useState(today);
+      const [horizonDays, setHorizonDays] = useState(30);
+      const [maxSafeResult, setMaxSafeResult] = useState(null);
+      const [isSearching, setIsSearching] = useState(false);
+
+      const handleSearch = (e) => {
+        e.preventDefault();
+        setIsSearching(true);
+
+        setTimeout(() => {
+          const holidaySet = new Set(holidays.map(h => h.date));
+          const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+          let lastSafeDate = null;
+          let lastSafeProjections = null;
+          let limiter = null;
+          let safeDaysCount = 0;
+
+          // Day-by-day forward search
+          for (let offset = 0; offset < horizonDays; offset++) {
+            const cur = new Date(depDate + 'T00:00:00');
+            cur.setDate(cur.getDate() + offset);
+            const candDate = cur.toISOString().split('T')[0];
+
+            // Calculate missed classes from depDate through candDate
+            const missedCounts = {};
+            subjects.forEach(s => { missedCounts[s.id] = 0; });
+
+            let iter = new Date(depDate + 'T00:00:00');
+            const targetEnd = new Date(candDate + 'T00:00:00');
+            while (iter <= targetEnd) {
+              const dStr = iter.toISOString().split('T')[0];
+              if (!holidaySet.has(dStr)) {
+                const dayOfWeek = dayNames[iter.getDay()];
+                const slots = timetable.filter(t => t.dayOfWeek === dayOfWeek);
+                slots.forEach(sl => {
+                  if (missedCounts[sl.subjectId] !== undefined) missedCounts[sl.subjectId]++;
+                });
+              }
+              iter.setDate(iter.getDate() + 1);
+            }
+
+            // Check if all subjects are safe
+            let anySubjectAtRisk = false;
+            let currentBottleneck = null;
+
+            const projections = subjects.map(s => {
+              const missed = missedCounts[s.id] || 0;
+              const currentPct = calculateCurrentAttendance(s.classesAttended, s.classesConducted);
+              const projectedPct = calculateProjectedAttendance(s.classesAttended, s.classesConducted, missed);
+              const isSafe = (projectedPct + 1e-9) >= s.minAttendancePercentage;
+              const margin = projectedPct - s.minAttendancePercentage;
+
+              if (!isSafe) anySubjectAtRisk = true;
+
+              const res = {
+                subjectId: s.id,
+                subjectName: s.name,
+                subjectCode: s.code,
+                color: s.color,
+                classesAttended: s.classesAttended,
+                classesConducted: s.classesConducted,
+                expectedMissedClasses: missed,
+                projectedAttendancePercentage: projectedPct,
+                requiredAttendancePercentage: s.minAttendancePercentage,
+                isSafe,
+                riskMargin: margin
+              };
+
+              if (!currentBottleneck || margin < currentBottleneck.riskMargin) {
+                currentBottleneck = res;
+              }
+
+              return res;
+            });
+
+            if (!anySubjectAtRisk) {
+              lastSafeDate = candDate;
+              lastSafeProjections = projections;
+              safeDaysCount = offset + 1;
+            } else {
+              if (offset === 0) {
+                // Departure date itself fails!
+                setMaxSafeResult({
+                  departureDate: depDate,
+                  recommendedReturnDate: depDate,
+                  safeDays: 0,
+                  departureDateSafe: false,
+                  limitingSubject: currentBottleneck,
+                  explanation: `CRITICAL: Missing classes on the departure date (${depDate}) alone causes '${currentBottleneck?.subjectName}' to drop to ${currentBottleneck?.projectedAttendancePercentage.toFixed(1)}%. You cannot travel safely on this date without attendance failure.`,
+                  projections
+                });
+                setIsSearching(false);
+                return;
+              }
+              limiter = currentBottleneck;
+              break;
+            }
+          }
+
+          setMaxSafeResult({
+            departureDate: depDate,
+            recommendedReturnDate: lastSafeDate,
+            safeDays: safeDaysCount,
+            departureDateSafe: true,
+            limitingSubject: limiter,
+            reachedHorizon: safeDaysCount === horizonDays,
+            explanation: safeDaysCount === horizonDays
+              ? `You can safely travel for the full ${horizonDays} days up to ${lastSafeDate} without violating attendance in any subject.`
+              : `Your maximum safe travel window is ${safeDaysCount} day(s) until ${lastSafeDate}. Extending your journey further breaches attendance in '${limiter?.subjectName}'.`,
+            projections: lastSafeProjections
+          });
+
+          setIsSearching(false);
+          showToast(`Maximum safe travel duration calculated: ${safeDaysCount} days!`);
+        }, 250);
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold uppercase tracking-wider mb-1 border border-blue-200">
+              <i data-lucide="compass" className="w-3 h-3"></i>
+              <span>Automated Duration Optimization</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Find My Maximum Safe Trip</h1>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Pick your intended departure date. TripSafe searches day-by-day along your schedule to determine the exact return date before any subject falls below 75%.
+            </p>
+          </div>
+
+          {/* Configuration Form */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Departure Date</label>
+                <input
+                  type="date"
+                  required
+                  value={depDate}
+                  onChange={e => setDepDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Search Horizon (Days)</label>
+                <select
+                  value={horizonDays}
+                  onChange={e => setHorizonDays(parseInt(e.target.value, 10))}
+                  className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value={7}>7 Days (1 Week Horizon)</option>
+                  <option value={14}>14 Days (2 Weeks Horizon)</option>
+                  <option value={21}>21 Days (3 Weeks Horizon)</option>
+                  <option value={30}>30 Days (1 Month Horizon)</option>
+                  <option value={60}>60 Days (Extended Horizon)</option>
+                </select>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all active:scale-95"
+                >
+                  <i data-lucide="search" className="w-4 h-4"></i>
+                  <span>{isSearching ? 'Analyzing...' : 'Find Maximum Safe Window'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Results Display */}
+          {maxSafeResult && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className={`p-6 rounded-2xl border shadow-sm ${
+                maxSafeResult.safeDays > 0 ? 'bg-indigo-50/70 border-indigo-200 text-slate-900' : 'bg-rose-50 border-rose-200 text-rose-950'
+              }`}>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-white text-brand-700 border border-brand-200">
+                      Recommended Safe Duration
+                    </span>
+                    <h2 className="text-3xl font-extrabold text-slate-900">
+                      {maxSafeResult.safeDays} Safe Day{maxSafeResult.safeDays === 1 ? '' : 's'}
+                    </h2>
+                    <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                      {maxSafeResult.explanation}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-xl border border-slate-200 text-right space-y-1">
+                    <div className="text-[11px] text-slate-400 font-semibold uppercase">Recommended Return Date</div>
+                    <div className="text-lg font-bold text-slate-900 font-mono">
+                      {maxSafeResult.recommendedReturnDate || 'N/A'}
+                    </div>
+                    {maxSafeResult.limitingSubject && (
+                      <div className="text-[11px] text-rose-600 font-semibold">
+                        Limiting Subject: {maxSafeResult.limitingSubject.subjectName}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Subject Breakdown at Recommended Date */}
+              {maxSafeResult.projections && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Projected Attendance at Recommended Return Date ({maxSafeResult.recommendedReturnDate})
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
+                        <tr>
+                          <th className="py-2.5 px-3">Subject</th>
+                          <th className="py-2.5 px-3">Missed Classes</th>
+                          <th className="py-2.5 px-3">Projected %</th>
+                          <th className="py-2.5 px-3">Target %</th>
+                          <th className="py-2.5 px-3">Remaining Margin Cushion</th>
+                          <th className="py-2.5 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {maxSafeResult.projections.map(p => (
+                          <tr key={p.subjectId}>
+                            <td className="py-2.5 px-3 font-semibold text-slate-800 flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }}></span>
+                              {p.subjectName}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono">{p.expectedMissedClasses}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900">{p.projectedAttendancePercentage.toFixed(1)}%</td>
+                            <td className="py-2.5 px-3 text-slate-500">{p.requiredAttendancePercentage}%</td>
+                            <td className="py-2.5 px-3 font-mono">
+                              <span className={p.riskMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                                {p.riskMargin >= 0 ? `+${p.riskMargin.toFixed(1)}%` : `${p.riskMargin.toFixed(1)}%`}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                p.isSafe ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                              }`}>
+                                {p.isSafe ? 'SAFE' : 'AT RISK'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 7. TRIP HISTORY VIEW
+    // =========================================================================
+    function TripHistoryView({ trips, setTrips, showToast, onPlanTrip }) {
+      const [selectedTripDetails, setSelectedTripDetails] = useState(null);
+
+      const handleDelete = (id, name) => {
+        if (confirm(`Delete trip record "${name}"?`)) {
+          setTrips(prev => prev.filter(t => t.id !== id));
+          showToast(`Deleted trip "${name}".`, 'info');
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Saved Trip Projections & Travel History</h1>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Audit past travel calculations and historical attendance projections.
+              </p>
+            </div>
+            <button
+              onClick={onPlanTrip}
+              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm"
+            >
+              <i data-lucide="plus" className="w-4 h-4"></i>
+              <span>Plan New Trip</span>
+            </button>
+          </div>
+
+          {trips.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-3">
+              <i data-lucide="calendar-x" className="w-12 h-12 text-slate-300 mx-auto"></i>
+              <h3 className="font-bold text-base text-slate-900">No Trips Saved Yet</h3>
+              <p className="text-xs text-slate-500">
+                Calculate a travel risk in the Trip Planner and click "Save Trip" to preserve it here.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
+                    <tr>
+                      <th className="py-3 px-4">Trip Destination / Name</th>
+                      <th className="py-3 px-4">Dates</th>
+                      <th className="py-3 px-4">Missed Classes</th>
+                      <th className="py-3 px-4">Subject Status</th>
+                      <th className="py-3 px-4">Overall Risk</th>
+                      <th className="py-3 px-4">Created On</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {trips.map(trip => (
+                      <tr key={trip.id} className="hover:bg-slate-50/60">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{trip.tripName}</div>
+                          {trip.notes && <div className="text-[10px] text-slate-400">{trip.notes}</div>}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-600">
+                          {trip.departureDate} → {trip.returnDate}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-slate-900">{trip.totalClassesMissed} classes</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-emerald-600 font-semibold">{trip.safeSubjectsCount} Safe</span>
+                          {trip.atRiskSubjectsCount > 0 && (
+                            <span className="text-rose-600 font-semibold ml-2">• {trip.atRiskSubjectsCount} At Risk</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            trip.overallStatus === 'SAFE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {trip.overallStatus === 'SAFE' ? 'SAFE' : 'AT RISK'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-400 text-[11px]">
+                          {trip.createdAt ? trip.createdAt.split('T')[0] : 'Recent'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {trip.projectionDetailsJson && trip.projectionDetailsJson !== '[]' && (
+                              <button
+                                onClick={() => {
+                                  try {
+                                    setSelectedTripDetails(JSON.parse(trip.projectionDetailsJson));
+                                  } catch (e) {
+                                    alert('Snapshot details not available');
+                                  }
+                                }}
+                                className="text-brand-600 hover:text-brand-800 p-1 font-semibold"
+                                title="View Saved Breakdown"
+                              >
+                                View Snapshot
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(trip.id, trip.tripName)}
+                              className="text-slate-400 hover:text-rose-600 p-1"
+                              title="Delete Record"
+                            >
+                              <i data-lucide="trash-2" className="w-4 h-4"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Snapshot Modal */}
+          {selectedTripDetails && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <h3 className="font-bold text-base text-slate-900">Historical Projection Snapshot</h3>
+                  <button onClick={() => setSelectedTripDetails(null)} className="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" className="w-5 h-5"></i>
+                  </button>
+                </div>
+
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
+                    <tr>
+                      <th className="py-2 px-3">Subject</th>
+                      <th className="py-2 px-3">Missed</th>
+                      <th className="py-2 px-3">Projected %</th>
+                      <th className="py-2 px-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {selectedTripDetails.map((p, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2 px-3 font-semibold text-slate-800">{p.subjectName}</td>
+                        <td className="py-2 px-3 font-mono">{p.expectedMissedClasses}</td>
+                        <td className="py-2 px-3 font-bold">{p.projectedAttendancePercentage?.toFixed(1) || p.projectedAttendancePercentage}%</td>
+                        <td className="py-2 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            p.status === 'SAFE' || p.isSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {p.status || (p.isSafe ? 'SAFE' : 'AT RISK')}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="flex justify-end pt-2 border-t">
+                  <button
+                    onClick={() => setSelectedTripDetails(null)}
+                    className="px-4 py-2 bg-slate-800 text-white font-semibold text-xs rounded-xl"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 8. SETTINGS & PROFILE VIEW
+    // =========================================================================
+    function SettingsView({ profile, setProfile, backendOnline, onCheckBackend, onResetDemo, onClearAll, showToast }) {
+      const [name, setName] = useState(profile.name);
+      const [roll, setRoll] = useState(profile.rollNumber);
+      const [college, setCollege] = useState(profile.collegeName);
+      const [hostel, setHostel] = useState(profile.hostelBlock);
+      const [minAtt, setMinAtt] = useState(profile.defaultMinAttendance);
+
+      const handleSaveProfile = (e) => {
+        e.preventDefault();
+        const updated = {
+          name: name.trim(),
+          rollNumber: roll.trim(),
+          collegeName: college.trim(),
+          hostelBlock: hostel.trim(),
+          defaultMinAttendance: parseFloat(minAtt) || 75
+        };
+        setProfile(updated);
+        showToast('Profile and preferences updated!', 'success');
+      };
+
+      return (
+        <div className="space-y-6 max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Student Profile & System Settings</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Configure hostel details, default threshold values, and demo storage.</p>
+          </div>
+
+          {/* Student Profile Form */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="font-bold text-base text-slate-900 border-b pb-3">Student & Hostel Information</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Roll / Student ID</label>
+                  <input
+                    type="text"
+                    value={roll}
+                    onChange={e => setRoll(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">College / University</label>
+                  <input
+                    type="text"
+                    value={college}
+                    onChange={e => setCollege(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Hostel Block & Room No.</label>
+                  <input
+                    type="text"
+                    value={hostel}
+                    onChange={e => setHostel(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Default Mandatory Minimum Attendance (%)</label>
+                <input
+                  type="number"
+                  min="50"
+                  max="100"
+                  value={minAtt}
+                  onChange={e => setMinAtt(e.target.value)}
+                  className="w-full sm:w-48 px-3.5 py-2.5 border rounded-xl border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-4 py-2.5 rounded-xl shadow-sm text-xs"
+                >
+                  Save Profile Settings
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Backend Connection Diagnostic Card */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="font-bold text-base text-slate-900 border-b pb-3">Backend Integration Status</h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${backendOnline ? 'bg-emerald-500' : 'bg-blue-500'}`}></span>
+                  <span className="font-bold text-slate-800">
+                    {backendOnline ? 'Spring Boot REST API is Online (Port 8080)' : 'Client-Side Engine Active (Backend Offline)'}
+                  </span>
+                </div>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  {backendOnline
+                    ? 'Requests are persistently processed through Spring Boot REST controllers and the relational repository layer.'
+                    : 'The client-side mathematical engine is running identical calculations locally in compliance with the verified formulas.'}
+                </p>
+              </div>
+
+              <button
+                onClick={onCheckBackend}
+                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold px-4 py-2 rounded-xl border border-slate-200"
+              >
+                <i data-lucide="refresh-cw" className="w-3.5 h-3.5"></i>
+                <span>Test Connection</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Data Reset & Demo Controls */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="font-bold text-base text-slate-900 border-b pb-3">Data Management & Reset Controls</h3>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
+                <h4 className="font-bold text-sm text-slate-800">Reload Sample Demo Data</h4>
+                <p className="text-xs text-slate-500">
+                  Resets the application with the verified college dataset (CS subjects, timetable, and sample holidays).
+                </p>
+                <button
+                  onClick={onResetDemo}
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs"
+                >
+                  Reload Demo Data
+                </button>
+              </div>
+
+              <div className="flex-1 p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2">
+                <h4 className="font-bold text-sm text-rose-900">Clear All Workspace Data</h4>
+                <p className="text-xs text-slate-500">
+                  Deletes all subjects, timetable entries, registered holidays, and trip history.
+                </p>
+                <button
+                  onClick={onClearAll}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs"
+                >
+                  Clear All Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render root application
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
