@@ -33,6 +33,9 @@ env/
 *.tar.gz
 *.tar
 
+# Helper scripts
+push_to_github.py
+
 # System and IDE
 .DS_Store
 .DS_Store?
